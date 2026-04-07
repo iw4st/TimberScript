@@ -140,25 +140,37 @@ listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Padding = UDim.new(0, 2)
 listLayout.Parent = listFrame
 
+local customBiomeNames = {
+    ["Nearest"] = "Nearest",
+    ["Birch Glade"] = "Birch Glade",
+    ["Enchanted Forest"] = "Thornveil",
+    ["Redwood Forest"] = "Scarlet Canopy",
+    ["Sakura Forest"] = "Koi Lanterns",
+    ["Snowy Peak"] = "Winterneedle"
+}
+
 local function ToggleDropdown()
     listFrame.Visible = not listFrame.Visible
-    mainDropdownBtn.Text = "🌍 Biome: " .. UIParams.selectedBiome .. (listFrame.Visible and " ▲" or " ▼")
+    local displayName = customBiomeNames[UIParams.selectedBiome] or UIParams.selectedBiome
+    mainDropdownBtn.Text = "🌍 Biome: " .. displayName .. (listFrame.Visible and " ▲" or " ▼")
 end
 mainDropdownBtn.MouseButton1Click:Connect(ToggleDropdown)
 
-local function PopulateDropdown(items)
+local function PopulateDropdown()
     for _, child in ipairs(listFrame:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
     
+    local biomes = {"Nearest", "Birch Glade", "Enchanted Forest", "Redwood Forest", "Sakura Forest", "Snowy Peak"}
     local totalHeight = 0
-    for _, itemName in ipairs(items) do
+    for _, internalName in ipairs(biomes) do
+        local displayName = customBiomeNames[internalName] or internalName
         local itemBtn = Instance.new("TextButton")
         itemBtn.Size = UDim2.new(1, -8, 0, 30)
         itemBtn.Position = UDim2.new(0, 4, 0, 0)
         itemBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
         itemBtn.BorderSizePixel = 0
-        itemBtn.Text = "  " .. itemName
+        itemBtn.Text = "  " .. displayName
         itemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         itemBtn.Font = Enum.Font.GothamMedium
         itemBtn.TextSize = 13
@@ -171,7 +183,7 @@ local function PopulateDropdown(items)
         corner.Parent = itemBtn
         
         itemBtn.MouseButton1Click:Connect(function()
-            UIParams.selectedBiome = itemName
+            UIParams.selectedBiome = internalName
             ToggleDropdown()
         end)
         
@@ -191,6 +203,7 @@ local validBiomes = {
     ["Birch Glade"] = true,
     ["Enchanted Forest"] = true,
     ["Palv Cove"] = true,
+    ["Palm Cove"] = true,
     ["Redwood Forest"] = true,
     ["Sakura Forest"] = true,
     ["Snowy Peak"] = true
@@ -212,45 +225,46 @@ local biomeAllowedCommons = {
 local biomeCenters = {}
 local biomeRadiuses = {}
 local biomeProps = {}
+local biomePropCounts = {}
 
-local function CalculateBiomeData()
-    if not Workspace:FindFirstChild("Map") then return {"Nearest"} end
-    
-    for _, folder in ipairs(Workspace.Map:GetChildren()) do
-        if (folder:IsA("Folder") or folder:IsA("Model")) and IsValidBiome(folder.Name) then
-            local minX, minZ = math.huge, math.huge
-            local maxX, maxZ = -math.huge, -math.huge
-            local props = {}
-            for _, obj in ipairs(folder:GetChildren()) do
-                local pos = nil
-                if obj:IsA("Model") and obj.PrimaryPart then pos = obj.PrimaryPart.Position
-                elseif obj:IsA("BasePart") then pos = obj.Position end
-                
-                if pos then
-                    table.insert(props, pos)
-                    minX, minZ = math.min(minX, pos.X), math.min(minZ, pos.Z)
-                    maxX, maxZ = math.max(maxX, pos.X), math.max(maxZ, pos.Z)
+task.spawn(function()
+    while task.wait(2) do
+        if not Workspace:FindFirstChild("Map") then continue end
+        for _, folder in ipairs(Workspace.Map:GetChildren()) do
+            if (folder:IsA("Folder") or folder:IsA("Model")) and IsValidBiome(folder.Name) then
+                local currentCount = biomePropCounts[folder.Name] or 0
+                local children = folder:GetChildren()
+                if #children > currentCount then
+                    local minX, minZ = math.huge, math.huge
+                    local maxX, maxZ = -math.huge, -math.huge
+                    local props = {}
+                    
+                    for _, obj in ipairs(children) do
+                        local pos = nil
+                        if obj:IsA("Model") and obj.PrimaryPart then pos = obj.PrimaryPart.Position
+                        elseif obj:IsA("BasePart") then pos = obj.Position end
+                        
+                        if pos then
+                            table.insert(props, pos)
+                            minX, minZ = math.min(minX, pos.X), math.min(minZ, pos.Z)
+                            maxX, maxZ = math.max(maxX, pos.X), math.max(maxZ, pos.Z)
+                        end
+                    end
+                    
+                    if #props > 0 then
+                        biomeProps[folder.Name] = props
+                        biomePropCounts[folder.Name] = #children
+                        biomeCenters[folder.Name] = Vector3.new((minX + maxX)/2, 0, (minZ + maxZ)/2)
+                        local diag = math.sqrt((maxX - minX)^2 + (maxZ - minZ)^2)
+                        biomeRadiuses[folder.Name] = (diag / 2) + 70 
+                    end
                 end
-            end
-            
-            if #props > 0 then
-                biomeCenters[folder.Name] = Vector3.new((minX + maxX)/2, 0, (minZ + maxZ)/2)
-                local diag = math.sqrt((maxX - minX)^2 + (maxZ - minZ)^2)
-                biomeRadiuses[folder.Name] = (diag / 2) + 70 
-                biomeProps[folder.Name] = props
             end
         end
     end
-    
-    local biomesList = {"Nearest"}
-    for _, folder in ipairs(Workspace.Map:GetChildren()) do
-        if biomeCenters[folder.Name] then table.insert(biomesList, folder.Name) end
-    end
-    return biomesList
-end
+end)
 
-local generatedBiomes = CalculateBiomeData()
-PopulateDropdown(generatedBiomes)
+PopulateDropdown()
 
 -- ==========================================================
 -- (ANTI-STEAL)
@@ -411,6 +425,22 @@ local function GetClosestTree()
                 end
             end
             
+            -- Проверка на исключенные биомы
+            local inBlacklistedBiome = false
+            local blacklisted = {"Palv Cove", "Palm Cove"}
+            for _, bName in ipairs(blacklisted) do
+                if biomeCenters[bName] and biomeRadiuses[bName] then
+                    local bx = biomeCenters[bName].X
+                    local bz = biomeCenters[bName].Z
+                    local distToCenter = math.sqrt((pivot.Position.X - bx)^2 + (pivot.Position.Z - bz)^2)
+                    if distToCenter <= biomeRadiuses[bName] * 1.1 then
+                        inBlacklistedBiome = true
+                        break
+                    end
+                end
+            end
+            if inBlacklistedBiome then continue end
+            
             local dist = (root.Position - pivot.Position).Magnitude
             if dist < closestDist then
                 closestDist = dist
@@ -500,7 +530,7 @@ task.spawn(function()
                         local dist = math.sqrt((root.Position.X - center.X)^2 + (root.Position.Z - center.Z)^2)
                         
                         if dist > radius * 0.9 then
-                            status.Text = "✈️ Teleporting to biome: " .. UIParams.selectedBiome
+                            status.Text = "✈️ Teleporting to biome: " .. (customBiomeNames[UIParams.selectedBiome] or UIParams.selectedBiome)
                             local props = biomeProps[UIParams.selectedBiome]
                             if props and #props > 0 then
                                 local tPos = props[math.random(#props)]
@@ -519,7 +549,7 @@ task.spawn(function()
                             end
                             continue
                         else
-                            status.Text = "⏳ Waiting for trees in " .. UIParams.selectedBiome
+                            status.Text = "⏳ Waiting for trees in " .. (customBiomeNames[UIParams.selectedBiome] or UIParams.selectedBiome)
                         end
                     end
                 else
