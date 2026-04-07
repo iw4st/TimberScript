@@ -1,0 +1,224 @@
+-- // 🌲 True Human Simulation AutoFarm v.13 (Exact Height + Freeze) 🌲 \\ --
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- ⚙️ CHARGE SETTINGS
+local CHARGE_TIME = 2.4 
+
+if _G.TreeFarmUI then _G.TreeFarmUI:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TreeFarm"
+screenGui.Parent = RunService:IsStudio() and Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui
+_G.TreeFarmUI = screenGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 160)
+frame.Position = UDim2.new(0.5, -160, 0.8, -80)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "🌲 VIM AutoFarm (Stable) 🌲"
+title.TextColor3 = Color3.fromRGB(255, 150, 50)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 30)
+status.Position = UDim2.new(0, 0, 0, 35)
+status.BackgroundTransparency = 1
+status.Text = "Status: READY TO WORK"
+status.TextColor3 = Color3.fromRGB(150, 150, 150)
+status.Font = Enum.Font.GothamMedium
+status.TextSize = 14
+status.Parent = frame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.8, 0, 0, 45)
+toggleBtn.Position = UDim2.new(0.1, 0, 0.55, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+toggleBtn.Text = "✅ ENABLE"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 16
+toggleBtn.Parent = frame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+local UIParams = {
+    enabled = false
+}
+
+toggleBtn.MouseButton1Click:Connect(function()
+    UIParams.enabled = not UIParams.enabled
+    if UIParams.enabled then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        toggleBtn.Text = "🛑 STOP"
+        status.Text = "⏳ Searching for trees..."
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+        toggleBtn.Text = "✅ ENABLE"
+        status.Text = "Status: STOPPED"
+        
+        local char = Players.LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.Anchored = false
+        end
+    end
+end)
+
+local function EquipAxe()
+    local char = Players.LocalPlayer.Character
+    local backpack = Players.LocalPlayer:FindFirstChild("Backpack")
+    if not char or not backpack then return false end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "axe") then
+            return true
+        end
+    end
+
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "axe") then
+            humanoid:EquipTool(tool)
+            task.wait(0.2)
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function GetClosestTree()
+    local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local closestDist = math.huge
+    local closestTree = nil
+    
+    local treesFolder = Workspace:FindFirstChild("Trees")
+    if not treesFolder then return nil end
+    
+    for _, tree in pairs(treesFolder:GetChildren()) do
+        if string.find(string.lower(tree.Name), "debris") then continue end
+        
+        local origin = tree:FindFirstChild("Origin")
+        if not origin then continue end 
+        
+        if not origin:FindFirstChild("TreeHealth") then continue end
+        if origin:FindFirstChild("TreeGrowInfo") then continue end
+        
+        local seed = tree:GetAttribute("Seed")
+        local culled = tree:GetAttribute("TreeCulled")
+        if seed and culled == false then
+            local pivot = tree:GetPivot()
+            local dist = (root.Position - pivot.Position).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestTree = tree
+            end
+        end
+    end
+    
+    return closestTree
+end
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if UIParams.enabled then
+            if not EquipAxe() then
+                status.Text = "❌ Axe not found!"
+                task.wait(1)
+                continue
+            end
+
+            local targetTree = GetClosestTree()
+            local char = Players.LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if targetTree and root then
+                status.Text = "🔥 Chopping: " .. (targetTree.Name or "Tree")
+                
+                local targetPos = targetTree:GetPivot().Position
+                
+                if (root.Position - targetPos).Magnitude > 6 then
+                    
+                    local p1 = root.Position
+                    local p2 = targetPos
+                    local dir = Vector3.new(p1.X - p2.X, 0, p1.Z - p2.Z)
+                    if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
+                    dir = dir.Unit
+                    
+                    local standPos = targetPos + (dir * 5)
+                    
+                    local excludeList = {char}
+                    local treesFolder = Workspace:FindFirstChild("Trees")
+                    if treesFolder then table.insert(excludeList, treesFolder) end
+                    
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = excludeList
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    -- 🔥 IGNORING INVISIBLE BLOCKS AND TRIGGERS:
+                    rayParams.RespectCanCollide = true 
+                    
+                    local rayOrigin = Vector3.new(standPos.X, targetPos.Y + 30, standPos.Z)
+                    local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0), rayParams)
+                    
+                    local groundY = targetPos.Y + 3
+                    if rayResult then
+                        groundY = rayResult.Position.Y + 3.2 
+                    end
+                    
+                    root.Velocity = Vector3.zero
+                    root.RotVelocity = Vector3.zero
+                    root.CFrame = CFrame.lookAt(
+                        Vector3.new(standPos.X, groundY, standPos.Z), 
+                        Vector3.new(targetPos.X, groundY, targetPos.Z)
+                    )
+                    root.Anchored = true 
+                    
+                    if humanoid then
+                        humanoid.Sit = false
+                        if humanoid:GetState() == Enum.HumanoidStateType.Ragdoll or humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
+                            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                        end
+                    end
+                    task.wait(0.15) 
+                else
+                    root.Anchored = true
+                    root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+                end
+                
+                local safeX, safeY = 20, 60 
+                
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
+                wait(0.315)
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
+                
+                task.wait(0.5) 
+            else
+                status.Text = "🤷♂️ No trees nearby..."
+            end
+        end
+    end
+end)
