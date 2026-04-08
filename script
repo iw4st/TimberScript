@@ -262,7 +262,7 @@ treeDropdownFrame.Parent = frame
 local treeDropdownBtn = Instance.new("TextButton")
 treeDropdownBtn.Size = UDim2.new(1, 0, 1, 0)
 treeDropdownBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
-treeDropdownBtn.Text = "🌲 Фарм: Все деревья ▼"
+treeDropdownBtn.Text = "🌲 Farm: all trees ▼"
 treeDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 treeDropdownBtn.Font = Enum.Font.GothamBold
 treeDropdownBtn.TextSize = 14
@@ -296,9 +296,9 @@ local function UpdateTreeBtnText()
     local c = 0
     for _, v in pairs(UIParams.selectedTrees) do if v then c = c + 1 end end
     if c == 0 then
-        treeDropdownBtn.Text = "🌲 Фарм: Все деревья " .. (treeListFrame.Visible and "▲" or "▼")
+        treeDropdownBtn.Text = "🌲 Farm: All trees " .. (treeListFrame.Visible and "▲" or "▼")
     else
-        treeDropdownBtn.Text = "🌲 Фарм: " .. c .. " выбр. " .. (treeListFrame.Visible and "▲" or "▼")
+        treeDropdownBtn.Text = "🌲 Farm: " .. c .. " selected " .. (treeListFrame.Visible and "▲" or "▼")
     end
 end
 
